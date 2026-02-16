@@ -1,0 +1,12 @@
+# Node
+node_modules/
+frontend/node_modules/
+
+# Next build output (optional but recommended)
+frontend/.next/
+frontend/out/
+
+# env files (optional)
+.env
+frontend/.env*
+backend/.env*
