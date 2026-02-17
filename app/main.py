@@ -19,10 +19,15 @@ app.include_router(detect_router)
 app.include_router(agent_router)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/app/uploads"))
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", "5000000"))  # 5MB
-CHUNK_SIZE = 1024 * 1024  # 1MB
+CHUNK_SIZE = 1024 * 1024  # 1MB\
+
+# Local -----------------------------------------
+#UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/app/uploads"))
+#UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+# GCP ------------------------------------------
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class RegisterRequest(BaseModel):
     email: EmailStr
