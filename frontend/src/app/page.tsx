@@ -10,7 +10,8 @@ type LoginResponse = {
 
 export default function Home() {
   const router = useRouter();
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  // const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  const API_BASE = "/api";
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("test@example.com");

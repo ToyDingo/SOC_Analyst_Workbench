@@ -158,10 +158,11 @@ function stepLabel(step: WorkflowStep) {
 
 export default function Page() {
   const router = useRouter();
-  const API_BASE = useMemo(
+  /* const API_BASE = useMemo(
     () => process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000",
     []
-  );
+  ); */
+  const API_BASE = useMemo(() => "/api", []);
 
   const [token, setToken] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
