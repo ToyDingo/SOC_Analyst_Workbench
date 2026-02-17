@@ -3,10 +3,11 @@ import os
 import json
 import uuid
 import psycopg
+
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-
 from app.auth import require_user
+from app.db import connect_db
 
 router = APIRouter()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -21,7 +22,7 @@ def _insert_finding(
     evidence: Dict[str, Any],
 ) -> str:
     finding_id = str(uuid.uuid4())
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -39,7 +40,7 @@ def _insert_finding(
 def run_detections(upload_id: str) -> Dict[str, Any]:
     created: List[str] = []
 
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
 
             # 1) Burst from single client IP in a minute (simple, powerful)
@@ -188,7 +189,7 @@ def start_detect(upload_id: str, user=Depends(require_user)):
 
 @router.get("/findings/{upload_id}")
 def list_findings(upload_id: str, user=Depends(require_user)):
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """

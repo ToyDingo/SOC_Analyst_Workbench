@@ -3,10 +3,12 @@ import json
 import os
 import psycopg
 
+from app.db import connect_db
+
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 def compute_features(upload_id: str, top_n: int = 20) -> dict:
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             # Overall stats
             cur.execute(
@@ -113,7 +115,7 @@ def build_minute_rollup(upload_id: str) -> int:
     """
     Build per-minute rollups (fast burst / beacon / exfil queries).
     """
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             # wipe previous rollups for this upload
             cur.execute("delete from event_rollup_minute where upload_id=%s", (upload_id,))

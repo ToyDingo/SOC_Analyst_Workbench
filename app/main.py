@@ -11,6 +11,7 @@ from app.analysis import router as analysis_router
 from app.ingest import run_ingest_job
 from app.detect import router as detect_router
 from app.agent_router import router as agent_router
+from app.db import connect_db
 
 app = FastAPI()
 app.include_router(analysis_router)
@@ -71,7 +72,7 @@ async def upload(
             out.write(chunk)
 
      # create upload row
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -83,7 +84,7 @@ async def upload(
 
     # create ingest job row
     ingest_job_id = str(uuid.uuid4())
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -113,7 +114,7 @@ def register(req: RegisterRequest):
     password_hash = hash_password(req.password)
 
     try:
-        with psycopg.connect(DATABASE_URL) as conn:
+        with connect_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -131,7 +132,7 @@ def register(req: RegisterRequest):
 def login(req: LoginRequest):
     email = req.email.lower().strip()
 
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, password_hash FROM users WHERE email = %s",
@@ -159,7 +160,7 @@ def start_ingest(upload_id: str, bg: BackgroundTasks, user=Depends(require_user)
     user_id = user["sub"]
 
     # find upload row + enforce ownership
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select id, user_id, filename from uploads where id=%s",
@@ -179,7 +180,7 @@ def start_ingest(upload_id: str, bg: BackgroundTasks, user=Depends(require_user)
         raise HTTPException(status_code=500, detail="Stored file missing on disk")
 
     job_id = str(uuid.uuid4())
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -199,7 +200,7 @@ def start_ingest(upload_id: str, bg: BackgroundTasks, user=Depends(require_user)
 def get_ingest(job_id: str, user=Depends(require_user)):
     user_id = user["sub"]
 
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -231,7 +232,7 @@ def get_ingest(job_id: str, user=Depends(require_user)):
 def get_features(upload_id: str, user=Depends(require_user)):
     user_id = user["sub"]
 
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute("select user_id from uploads where id=%s", (upload_id,))
             row = cur.fetchone()
@@ -241,7 +242,7 @@ def get_features(upload_id: str, user=Depends(require_user)):
     if str(row[0]) != str(user_id):
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute("select stats from upload_features where upload_id=%s", (upload_id,))
             row2 = cur.fetchone()

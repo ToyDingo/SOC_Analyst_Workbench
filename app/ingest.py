@@ -5,6 +5,7 @@ import psycopg
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, List
 from app.features import compute_features, build_minute_rollup
+from app.db import connect_db
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 DT_FMT = "%Y-%m-%d %H:%M:%S"
@@ -84,7 +85,7 @@ values (
 """
 
 def _set_ingest_job(job_id: str, status: str, inserted: int, bad: int, error: Optional[str] = None) -> None:
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -112,7 +113,7 @@ def run_ingest_job(job_id: str, upload_id: str, file_path: str, batch_size: int 
     try:
         _set_ingest_job(job_id, "running", inserted, bad_lines)
 
-        with psycopg.connect(DATABASE_URL) as conn:
+        with connect_db() as conn:
             with conn.cursor() as cur:
                 with open(file_path, "r", encoding="utf-8") as f:
                     for line in f:
