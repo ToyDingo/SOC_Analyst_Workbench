@@ -1,16 +1,20 @@
-FROM node:20-alpine
-
+# --- deps ---
+FROM node:20-alpine AS deps
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci
 
+# --- build ---
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-#EXPOSE 3000
+# --- run ---
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app ./
 EXPOSE 8080
-
-#CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"] # For localhost development
-CMD ["sh", "-c", "npm run dev -- --hostname 0.0.0.0 --port ${PORT:-8080}"] # For Google Cloud Run, use the PORT environment variable
-
+CMD ["sh", "-c", "npm run start -- -H 0.0.0.0 -p ${PORT:-8080}"]
