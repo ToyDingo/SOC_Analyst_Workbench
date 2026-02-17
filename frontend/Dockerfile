@@ -1,12 +1,12 @@
 FROM node:20-slim AS deps
 WORKDIR /app
-COPY frontend/package*.json ./
+COPY package*.json ./
 RUN npm ci
 
 FROM node:20-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY frontend ./
+COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
@@ -16,5 +16,6 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=builder /app ./
+
 EXPOSE 8080
-CMD ["sh", "-c", "npm run start"]
+CMD ["sh", "-c", "npx next start -H 0.0.0.0 -p ${PORT:-8080}"]
