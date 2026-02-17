@@ -26,8 +26,8 @@ CHUNK_SIZE = 1024 * 1024  # 1MB\
 #UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/app/uploads"))
 #UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # GCP ------------------------------------------
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/tmp/uploads"))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 class RegisterRequest(BaseModel):
     email: EmailStr
