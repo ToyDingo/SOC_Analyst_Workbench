@@ -549,7 +549,6 @@ export default function Page() {
             Log Investigation Pipeline
           </div>
           {email && <Pill text={`User: ${email}`} tone="info" />}
-          <span style={{ color: "#d1d5db", fontSize: 12 }}>API: {API_BASE}</span>
         </div>
 
         <button
