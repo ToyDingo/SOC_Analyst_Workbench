@@ -30,4 +30,7 @@ def get_db_dsn() -> str:
     return f"postgresql://{user}:{password}@/{dbname}?host=/cloudsql/{instance}"
 
 def connect_db():
-    return psycopg.connect(get_db_dsn())
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL is required")
+    return psycopg.connect(url)

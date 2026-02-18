@@ -1,3 +1,5 @@
+# frontend/Dockerfile
+
 FROM node:20-slim AS deps
 WORKDIR /app
 COPY package*.json ./
@@ -15,11 +17,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/next.config.* ./ 2>/dev/null || true
+# Bring in everything including the build output (.next)
+COPY --from=builder /app ./
 
 EXPOSE 8080
-CMD ["sh","-c","npx next start -H 0.0.0.0 -p ${PORT:-8080}"]
+
+# One image, two modes:
+# - ENV=local  -> next dev
+# - otherwise  -> next start (Cloud Run / prod)
+CMD ["sh", "-c", "if [ \"$ENV\" = \"local\" ]; then npm run dev; else npx next start -H 0.0.0.0 -p ${PORT:-8080}; fi"]

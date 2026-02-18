@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiBase } from "@/lib/apiBase";
 
 type LoginResponse = {
   access_token: string;
@@ -10,8 +11,8 @@ type LoginResponse = {
 
 export default function Home() {
   const router = useRouter();
-  // const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-  const API_BASE = "/api";
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  //const API_BASE = "/api";
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("test@example.com");
@@ -27,7 +28,7 @@ export default function Home() {
       if (!token) return;
 
       try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
+        const res = await fetch(`${apiBase()}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -51,7 +52,7 @@ export default function Home() {
 
     try {
       if (mode === "login") {
-        const res = await fetch(`${API_BASE}/auth/login`, {
+        const res = await fetch(`${apiBase()}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
@@ -73,7 +74,7 @@ export default function Home() {
       }
 
       // mode === "register"
-      const regRes = await fetch(`${API_BASE}/auth/register`, {
+      const regRes = await fetch(`${apiBase()}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -87,7 +88,7 @@ export default function Home() {
       }
 
       // Registration succeeded — now login to get token
-      const loginRes = await fetch(`${API_BASE}/auth/login`, {
+      const loginRes = await fetch(`${apiBase()}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

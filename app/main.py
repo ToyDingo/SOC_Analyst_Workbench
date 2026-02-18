@@ -20,14 +20,15 @@ app.include_router(agent_router)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", "5000000"))  # 5MB
-CHUNK_SIZE = 1024 * 1024  # 1MB\
+CHUNK_SIZE = 1024 * 1024  # 1MB
 
-# Local -----------------------------------------
-#UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/app/uploads"))
-#UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-# GCP ------------------------------------------
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/tmp/uploads"))
+# Cloud Run sets K_SERVICE. Local docker-compose won't.
+IS_CLOUD_RUN = bool(os.getenv("K_SERVICE"))
+
+DEFAULT_UPLOAD_DIR = "/tmp/uploads" if IS_CLOUD_RUN else "/app/uploads"
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", DEFAULT_UPLOAD_DIR))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -61,7 +62,7 @@ async def upload(
     content_type = file.content_type
     user_id = user["sub"]
 
-    stored_path = UPLOAD_DIR / f"{upload_id}__{filename}"
+    stored_path = (UPLOAD_DIR / f"{upload_id}__{filename}")
 
     # stream to disk (no full RAM read)
     size_bytes = 0

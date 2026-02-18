@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiBase } from "@/lib/apiBase";
 
 type JobStatus = "queued" | "running" | "done" | "failed";
 type WorkflowStep = "upload" | "detect" | "respond";
@@ -246,7 +247,7 @@ export default function Page() {
   async function apiFetch(path: string, init?: RequestInit) {
     const headers: Record<string, string> = { ...(init?.headers as any) };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    const res = await fetch(`${apiBase()}${path}`, { ...init, headers });
 
     // IMPORTANT: parse safely (agent endpoints sometimes return plain text on errors)
     const text = await res.text();
@@ -269,7 +270,7 @@ export default function Page() {
         router.push("/");
         return;
       }
-      const res = await fetch(`${API_BASE}/auth/me`, {
+      const res = await fetch(`${apiBase()}/auth/me`, {
         headers: { Authorization: `Bearer ${t}` },
       });
       if (!res.ok) {
@@ -314,7 +315,7 @@ export default function Page() {
       const form = new FormData();
       form.append("file", selectedFile);
 
-      const res = await fetch(`${API_BASE}/upload`, {
+      const res = await fetch(`${apiBase()}/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,
