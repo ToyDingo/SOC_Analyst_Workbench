@@ -1,5 +1,3 @@
-# Project Title
-
 ## SOC_Analyst_Workbench
 
 A lightweight SOC investigation platform for log ingestion, detection, and AI-assisted incident reporting.
