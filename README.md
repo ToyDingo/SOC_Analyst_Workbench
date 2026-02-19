@@ -133,7 +133,9 @@ If database schema issues occur, you may need to:
 docker compose down -v
 docker compose up --build
 ```
-
+If database schema issues still occur, please check that tables are present. 
+If no tables are present, you will have to log in to the database and run the 
+schema.sql script found in the /app folder. 
 ---
 
 # Authors
