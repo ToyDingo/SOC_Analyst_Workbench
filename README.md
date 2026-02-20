@@ -140,6 +140,13 @@ schema.sql script found in the /app folder.
 
 ---
 
+# Sample Logs
+
+Log file samples can be found on my google drive:
+https://drive.google.com/drive/folders/1btYO7F5MAiWQVo7DikolDAT7nUjchWwU?usp=sharing
+
+---
+
 # Authors
 
 Kevin Ford
