@@ -543,7 +543,7 @@ export default function Page() {
       >
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
           <div style={{ fontWeight: 900, letterSpacing: 0.4, color: "#ffffff" }}>
-            SOC Console
+            SOC Analyst Workbench
           </div>
           <div style={{ color: "#d1d5db", fontSize: 13 }}>
             Log Investigation Pipeline
