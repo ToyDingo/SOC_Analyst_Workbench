@@ -1,3 +1,9 @@
+""" This module contains the authentication logic, including password hashing, 
+JWT token creation and verification, and a dependency function to require 
+authentication for protected endpoints. 
+
+Accessed by main.py for user registration, login, and protected endpoints."""
+
 import os
 import time
 import jwt

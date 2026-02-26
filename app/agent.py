@@ -1,4 +1,8 @@
-# app/agent.py
+""" This module defines the SOC investigation agent, its tools,
+and the main function to run a report. 
+
+Accessed by main.py """
+
 import os
 import json
 import psycopg
@@ -12,10 +16,26 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")  # match what you're using
 
+# The main function to run a SOC report for a given upload_id, using the agent.
+def run_soc_report(upload_id: str) -> Dict[str, Any]:
+    executor = build_agent()
+    result = executor.invoke({"upload_id": upload_id})
+
+    # result["output"] is a string; ensure it's JSON
+    out = result.get("output", "{}")
+    try:
+        return json.loads(out)
+    except Exception:
+        # fallback: wrap raw text
+        return {"summary": out, "incidents": [], "iocs": {}, "recommended_actions": [], "citations": [], "gaps": ["Agent output was not valid JSON."]}
+
 # -----------------------
 # Tools 
 # -----------------------
 
+# A tool to list findings for an upload_id, returning key 
+# details for each finding to help the agent understand 
+# the named patterns detected.
 @tool
 def get_upload_features(upload_id: str) -> Dict[str, Any]:
     """Fetch precomputed upload_features.stats for an upload_id."""
@@ -25,6 +45,9 @@ def get_upload_features(upload_id: str) -> Dict[str, Any]:
             row = cur.fetchone()
     return row[0] if row else {}
 
+# A tool to list findings for an upload_id, returning key 
+# details for each finding to help the agent understand the 
+# named patterns detected.
 @tool
 def list_findings(upload_id: str) -> List[Dict[str, Any]]:
     """List findings for an upload_id."""
@@ -55,6 +78,7 @@ def list_findings(upload_id: str) -> List[Dict[str, Any]]:
         })
     return out
 
+# A tool to fetch a single event by its ID, returning all relevant fields for investigation and citation.
 @tool
 def get_event_by_id(event_id: int) -> Dict[str, Any]:
     """Fetch a single event by its DB id (events.id)."""
@@ -88,6 +112,7 @@ def get_event_by_id(event_id: int) -> Dict[str, Any]:
         "raw": row[12],
     }
 
+# A tool to search events with flexible filters, returning compact rows for quick review and citation.
 @tool
 def search_events(
     upload_id: str,
@@ -157,6 +182,8 @@ def search_events(
         "threat_name": r[9],
     } for r in rows]
 
+# A tool to query the minute rollup table for quick summaries of 
+# top buckets, to help the agent find spikes and concentrations in the data.
 @tool
 def rollup_minute_top(
     upload_id: str,
@@ -234,6 +261,7 @@ def rollup_minute_top(
         for r in rows
     ]
 
+# A quick profile of an entity (client_ip/user_email/dest_host) based on raw events, to help scope investigations.
 @tool
 def entity_profile(
     upload_id: str,
@@ -309,65 +337,66 @@ def entity_profile(
 # Agent factory
 # -----------------------
 
+# Constructs the SOC investigation agent with its tools and prompt.
 def build_agent():
     llm = ChatOpenAI(model=OPENAI_MODEL)
     tools = [get_upload_features, list_findings, search_events, get_event_by_id, rollup_minute_top, entity_profile]
     system = """
-You are a SOC investigation agent. You must behave like an investigator, not a summarizer.
+            You are a SOC investigation agent. You must behave like an investigator, not a summarizer.
 
-PRIMARY GOAL:
-Convert deterministic detections + underlying log evidence into a SOC report focused on SECURITY OUTCOMES.
+            PRIMARY GOAL:
+            Convert deterministic detections + underlying log evidence into a SOC report focused on SECURITY OUTCOMES.
 
-You have tools to retrieve:
-- findings (named patterns) for an upload_id
-- rollup summaries (minute buckets)
-- sample raw events for specific entities (user/ip/host/category)
+            You have tools to retrieve:
+            - findings (named patterns) for an upload_id
+            - rollup summaries (minute buckets)
+            - sample raw events for specific entities (user/ip/host/category)
 
-MANDATORY TOOL USE:
-You MUST call list_findings(upload_id) first.
-If you reference any domain/ip/user/category, you MUST be able to cite at least one finding_id or event_id supporting it.
-If evidence is insufficient, call search_events(...) or get_rollup_summary(...) to gather it.
+            MANDATORY TOOL USE:
+            You MUST call list_findings(upload_id) first.
+            If you reference any domain/ip/user/category, you MUST be able to cite at least one finding_id or event_id supporting it.
+            If evidence is insufficient, call search_events(...) or get_rollup_summary(...) to gather it.
 
-SECURITY OUTCOME TAXONOMY (use these labels when supported; otherwise use INSUFFICIENT_EVIDENCE):
-- SUSPECTED_ENDPOINT_COMPROMISE_MULTI_STAGE
-- C2_BEACONING_SUSPECTED
-- PHISH_TO_PAYLOAD_CHAIN_SUSPECTED
-- DATA_EXFILTRATION_ATTEMPT_SUSPECTED
-- CREDENTIAL_HARVESTING_SUSPECTED
-- RANSOMWARE_STAGING_SUSPECTED
-- CRYPTOMINING_ACTIVITY_SUSPECTED
-- INSUFFICIENT_EVIDENCE
+            SECURITY OUTCOME TAXONOMY (use these labels when supported; otherwise use INSUFFICIENT_EVIDENCE):
+            - SUSPECTED_ENDPOINT_COMPROMISE_MULTI_STAGE
+            - C2_BEACONING_SUSPECTED
+            - PHISH_TO_PAYLOAD_CHAIN_SUSPECTED
+            - DATA_EXFILTRATION_ATTEMPT_SUSPECTED
+            - CREDENTIAL_HARVESTING_SUSPECTED
+            - RANSOMWARE_STAGING_SUSPECTED
+            - CRYPTOMINING_ACTIVITY_SUSPECTED
+            - INSUFFICIENT_EVIDENCE
 
-OUTPUT FORMAT (STRICT):
-Return ONE valid JSON object and NOTHING ELSE. No prose outside JSON.
+            OUTPUT FORMAT (STRICT):
+            Return ONE valid JSON object and NOTHING ELSE. No prose outside JSON.
 
-The JSON object must contain these top-level keys:
-- summary: string (3-6 sentences)
-- timeline: array of objects (at least 5 entries if data exists)
-    - ts_start: ISO string
-    - ts_end: ISO string
-    - label: string
-    - evidence_finding_ids: array of strings
-    - evidence_event_ids: array of strings
-- incidents: array of objects (at least 1)
-    - title: string
-    - severity: low|medium|high|critical
-    - confidence: number 0.0-1.0
-    - confirmed: boolean
-    - security_outcomes: array of taxonomy labels
-    - affected_entities: object with optional keys user_emails, client_ips, dest_hosts, threat_categories
-    - evidence_finding_ids: array of strings (NON-EMPTY)
-    - evidence_event_ids: array of strings
-    - why: array of short strings (3-7 bullets)
-    - recommended_actions: array of short strings (5-12 bullets)
-- iocs: object
-    - domains: array of strings
-    - urls: array of strings
-    - ips: array of strings
-    - users: array of strings
-- gaps: array of strings
-- evidence_queries: array of strings (describe what tools you called + why)
-"""
+            The JSON object must contain these top-level keys:
+            - summary: string (3-6 sentences)
+            - timeline: array of objects (at least 5 entries if data exists)
+                - ts_start: ISO string
+                - ts_end: ISO string
+                - label: string
+                - evidence_finding_ids: array of strings
+                - evidence_event_ids: array of strings
+            - incidents: array of objects (at least 1)
+                - title: string
+                - severity: low|medium|high|critical
+                - confidence: number 0.0-1.0
+                - confirmed: boolean
+                - security_outcomes: array of taxonomy labels
+                - affected_entities: object with optional keys user_emails, client_ips, dest_hosts, threat_categories
+                - evidence_finding_ids: array of strings (NON-EMPTY)
+                - evidence_event_ids: array of strings
+                - why: array of short strings (3-7 bullets)
+                - recommended_actions: array of short strings (5-12 bullets)
+            - iocs: object
+                - domains: array of strings
+                - urls: array of strings
+                - ips: array of strings
+                - users: array of strings
+            - gaps: array of strings
+            - evidence_queries: array of strings (describe what tools you called + why)
+            """
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", system),
@@ -377,15 +406,3 @@ The JSON object must contain these top-level keys:
 
     agent = create_tool_calling_agent(llm, tools, prompt)
     return AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=8)
-
-def run_soc_report(upload_id: str) -> Dict[str, Any]:
-    executor = build_agent()
-    result = executor.invoke({"upload_id": upload_id})
-
-    # result["output"] is a string; ensure it's JSON
-    out = result.get("output", "{}")
-    try:
-        return json.loads(out)
-    except Exception:
-        # fallback: wrap raw text
-        return {"summary": out, "incidents": [], "iocs": {}, "recommended_actions": [], "citations": [], "gaps": ["Agent output was not valid JSON."]}

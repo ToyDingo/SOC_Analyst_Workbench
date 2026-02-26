@@ -1,3 +1,10 @@
+""" This is the main FastAPI application file. It defines the API endpoints 
+for user registration, login, file upload, and ingest job management. 
+It also includes routers for analysis, detection, and agent operations.
+The application uses a PostgreSQL database to store user information, 
+uploads, and ingest jobs. Uploaded files are stored on disk, and ingestion 
+is processed in the background using FastAPI's BackgroundTasks. """
+
 import os
 import uuid
 import psycopg
@@ -29,7 +36,6 @@ DEFAULT_UPLOAD_DIR = "/tmp/uploads" if IS_CLOUD_RUN else "/app/uploads"
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", DEFAULT_UPLOAD_DIR))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
@@ -38,7 +44,11 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-#-----API Endpoints-----#
+#-----------------------
+# API Endpionts   
+#----------------------- 
+
+# A simple test endpoint to verify that path parameters are working
 @app.get("/play/{name}/{age}")
 def play(name: str, age: int):
     return {"message": f"Your name is {name} and you are {age} year(s) old."}
@@ -51,6 +61,7 @@ def health():
 def root():
     return {"message": "Hello from FastAPI in Docker"}
 
+# Starts the upload process   
 @app.post("/upload")
 async def upload(
     bg: BackgroundTasks,
@@ -113,6 +124,105 @@ async def upload(
         "ingest_status": "queued",
     }
 
+# Starts the ingestion process  
+@app.post("/ingest/{upload_id}")
+def start_ingest(upload_id: str, bg: BackgroundTasks, user=Depends(require_user)):
+    user_id = user["sub"]
+
+    # find upload row + enforce ownership
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select id, user_id, filename from uploads where id=%s",
+                (upload_id,),
+            )
+            row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    if str(row[1]) != str(user_id):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # locate stored file (matches upload naming scheme)
+    filename = row[2]
+    stored_path = UPLOAD_DIR / f"{upload_id}__{filename}"
+    if not stored_path.exists():
+        raise HTTPException(status_code=500, detail="Stored file missing on disk")
+
+    job_id = str(uuid.uuid4())
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO ingest_jobs (id, upload_id, user_id, status)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (job_id, upload_id, user_id, "queued"),
+            )
+
+    # run ingestion in background
+    bg.add_task(run_ingest_job, job_id, upload_id, str(stored_path))
+
+    return {"job_id": job_id, "upload_id": upload_id, "status": "queued"}
+
+# Retrives the status of the ingest job  
+@app.get("/ingest/{job_id}")
+def get_ingest(job_id: str, user=Depends(require_user)):
+    user_id = user["sub"]
+
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select id, upload_id, user_id, status, inserted_events, bad_lines, error, created_at, updated_at
+                from ingest_jobs
+                where id=%s
+                """,
+                (job_id,),
+            )
+            row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Ingest job not found")
+    if str(row[2]) != str(user_id):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return {
+        "job_id": str(row[0]),
+        "upload_id": str(row[1]),
+        "status": row[3],
+        "inserted_events": int(row[4] or 0),
+        "bad_lines": int(row[5] or 0),
+        "error": row[6],
+        "created_at": row[7].isoformat() if row[7] else None,
+        "updated_at": row[8].isoformat() if row[8] else None,
+    }
+
+# Retrieves the extracted features for a given upload ID, ensuring the user has access rights.
+@app.get("/features/{upload_id}")
+def get_features(upload_id: str, user=Depends(require_user)):
+    user_id = user["sub"]
+
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("select user_id from uploads where id=%s", (upload_id,))
+            row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    if str(row[0]) != str(user_id):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    with connect_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("select stats from upload_features where upload_id=%s", (upload_id,))
+            row2 = cur.fetchone()
+
+    if not row2:
+        return {"stats": {}}
+
+    return {"stats": row2[0]}
+
 @app.post("/auth/register")
 def register(req: RegisterRequest):
     user_id = str(uuid.uuid4())
@@ -160,103 +270,6 @@ def login(req: LoginRequest):
 def me(user=Depends(require_user)):
     # user is the decoded JWT payload
     return {"user_id": user["sub"], "email": user.get("email")}
-
-@app.post("/ingest/{upload_id}")
-def start_ingest(upload_id: str, bg: BackgroundTasks, user=Depends(require_user)):
-    user_id = user["sub"]
-
-    # find upload row + enforce ownership
-    with connect_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "select id, user_id, filename from uploads where id=%s",
-                (upload_id,),
-            )
-            row = cur.fetchone()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Upload not found")
-    if str(row[1]) != str(user_id):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    # locate stored file (matches upload naming scheme)
-    filename = row[2]
-    stored_path = UPLOAD_DIR / f"{upload_id}__{filename}"
-    if not stored_path.exists():
-        raise HTTPException(status_code=500, detail="Stored file missing on disk")
-
-    job_id = str(uuid.uuid4())
-    with connect_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO ingest_jobs (id, upload_id, user_id, status)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (job_id, upload_id, user_id, "queued"),
-            )
-
-    # run ingestion in background
-    bg.add_task(run_ingest_job, job_id, upload_id, str(stored_path))
-
-    return {"job_id": job_id, "upload_id": upload_id, "status": "queued"}
-
-
-@app.get("/ingest/{job_id}")
-def get_ingest(job_id: str, user=Depends(require_user)):
-    user_id = user["sub"]
-
-    with connect_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                select id, upload_id, user_id, status, inserted_events, bad_lines, error, created_at, updated_at
-                from ingest_jobs
-                where id=%s
-                """,
-                (job_id,),
-            )
-            row = cur.fetchone()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Ingest job not found")
-    if str(row[2]) != str(user_id):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    return {
-        "job_id": str(row[0]),
-        "upload_id": str(row[1]),
-        "status": row[3],
-        "inserted_events": int(row[4] or 0),
-        "bad_lines": int(row[5] or 0),
-        "error": row[6],
-        "created_at": row[7].isoformat() if row[7] else None,
-        "updated_at": row[8].isoformat() if row[8] else None,
-    }
-
-@app.get("/features/{upload_id}")
-def get_features(upload_id: str, user=Depends(require_user)):
-    user_id = user["sub"]
-
-    with connect_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("select user_id from uploads where id=%s", (upload_id,))
-            row = cur.fetchone()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Upload not found")
-    if str(row[0]) != str(user_id):
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    with connect_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute("select stats from upload_features where upload_id=%s", (upload_id,))
-            row2 = cur.fetchone()
-
-    if not row2:
-        return {"stats": {}}
-
-    return {"stats": row2[0]}
 
 app.add_middleware(
     CORSMiddleware,

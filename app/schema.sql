@@ -1,3 +1,10 @@
+/* Run this SQL script to set up the database schema for the 
+application. It creates tables for users, uploads, analysis 
+jobs, events, ingest jobs, event rollups, upload features,
+ and findings. It also adds necessary indexes and foreign 
+ key constraints to ensure data integrity and optimize query 
+ performance. */
+
 -- USERS
 CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY,

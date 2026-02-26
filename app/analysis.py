@@ -1,3 +1,12 @@
+""" !!!THIS MODULE IS NO LONGER IN USE!!!
+
+This module implements the core analysis logic for processing uploaded 
+log files, extracting signals, and generating structured 
+insights using an LLM. It defines API endpoints to start 
+analysis jobs and retrieve results, and uses background 
+tasks to run the potentially long-running analysis without blocking 
+the main thread. """
+
 import json
 import os
 import re

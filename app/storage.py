@@ -1,4 +1,8 @@
-# app/storage.py
+""" This module contains the storage logic
+
+Accessed by main.py for handling file uploads, determining 
+storage locations (local vs GCS), and related utilities. """
+
 import os
 from pathlib import Path
 from typing import Optional

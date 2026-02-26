@@ -1,3 +1,9 @@
+""" This module defines the SOC investigation agent, its tools, and 
+the main function to run a report.
+
+Accessed by main.py for the /agent/report/{upload_id} endpoint, 
+which triggers a SOC report generation for a given upload_id.  """
+
 from fastapi import APIRouter, Depends
 from app.auth import require_user
 from app.agent import run_soc_report

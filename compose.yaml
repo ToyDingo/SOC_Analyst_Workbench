@@ -18,9 +18,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - ENV=local
-      # Browser (your laptop) -> API
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-      # Server-side code running inside web container -> API service name
       - INTERNAL_API_BASE_URL=http://api:8000
     volumes:
       - ./frontend:/app

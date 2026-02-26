@@ -1,4 +1,9 @@
-# app/features.py
+""" This module contains the logic for computing features from 
+ingested events, as well as building per-minute rollups for 
+fast querying. 
+
+Called by ingest.py  """ 
+    
 import json
 import os
 import psycopg
@@ -7,6 +12,10 @@ from app.db import connect_db
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
+# Compute various features and stats for a given upload ID,
+# and store them in the upload_features table. This includes 
+# overall stats, top users, top IPs, top hosts, and top threat 
+# categories.
 def compute_features(upload_id: str, top_n: int = 20) -> dict:
     with connect_db() as conn:
         with conn.cursor() as cur:
@@ -110,11 +119,8 @@ def compute_features(upload_id: str, top_n: int = 20) -> dict:
 
     return stats
 
-
+# Build per-minute rollups (fast burst / beacon / exfil queries).
 def build_minute_rollup(upload_id: str) -> int:
-    """
-    Build per-minute rollups (fast burst / beacon / exfil queries).
-    """
     with connect_db() as conn:
         with conn.cursor() as cur:
             # wipe previous rollups for this upload

@@ -1,7 +1,12 @@
-# app/db.py
+""" This module contains the database connection logic,    
+as well as helper functions for connecting to the database. 
+
+Accessed by other modules to perform database operations."""
+
 import os
 import psycopg
 
+# Database connection logic. Uses DATABASE_URL env var, or constructs a DSN for Cloud Run + Cloud SQL if not provided.
 def get_db_dsn() -> str:
     """
     Cloud Run + Cloud SQL (Postgres) best practice:
