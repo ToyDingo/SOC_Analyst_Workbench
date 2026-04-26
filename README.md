@@ -147,6 +147,13 @@ https://drive.google.com/drive/folders/1btYO7F5MAiWQVo7DikolDAT7nUjchWwU?usp=sha
 
 ---
 
+# Video Demonstration
+
+A quick video to demonstrate how this production works:
+https://drive.google.com/file/d/1sALWQ_nj_8tL3PIXrxm6ntqMMpVuXHK7/view?usp=drive_link
+
+---
+
 # Authors
 
 Kevin Ford
